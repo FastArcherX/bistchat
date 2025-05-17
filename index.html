@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BIST Chat</title>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
+    #sidebar { width: 30%; background: #f0f0f0; padding: 10px; overflow-y: auto; }
+    #main { flex: 1; display: flex; flex-direction: column; }
+    #chat-header { background: #ddd; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+    #chat-area { flex: 1; padding: 10px; overflow-y: auto; background: #fff; }
+    #chat-input { display: flex; padding: 10px; background: #eee; }
+    #chat-input input { flex: 1; padding: 5px; }
+    #chat-input button { padding: 5px 10px; }
+    #login { padding: 20px; }
+    .chat-item { padding: 5px; cursor: pointer; border-bottom: 1px solid #ccc; }
+    .chat-item.active { background: #ddd; }
+  </style>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getDatabase, ref, set, get, onChildAdded, off, orderByChild, query, equalTo } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAKA15Li2IOnKKFrR7JAWw1SOPD31eIYZU",
+      authDomain: "bist-chat.firebaseapp.com",
+      databaseURL: "https://bist-chat-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "bist-chat",
+      storageBucket: "bist-chat.firebasestorage.app",
+      messagingSenderId: "1009316312831",
+      appId: "1:1009316312831:web:67996e1e45f7e6498afeca"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    let currentUser = null;
+    let currentChat = "bist";
+    let messageListeners = {};
+    let displayNameMap = {};
+
+    window.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("login-btn").onclick = login;
+      document.getElementById("send-btn").onclick = sendMessage;
+      document.getElementById("add-btn").onclick = addUserChat;
+      document.getElementById("name-btn").onclick = changeDisplayName;
+      document.getElementById("logout-btn").onclick = logout;
+    });
+
+    function login() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      signInWithEmailAndPassword(auth, email, password)
+        .then(userCred => {
+          currentUser = userCred.user;
+          get(ref(db, "profiles/" + currentUser.uid)).then(snap => {
+            if (!snap.exists()) {
+              const name = prompt("Inserisci il tuo nome utente visibile:");
+              set(ref(db, "profiles/" + currentUser.uid), {
+                email: currentUser.email,
+                name: name
+              });
+            }
+          });
+          document.getElementById("login").style.display = "none";
+          document.getElementById("app").style.display = "flex";
+          loadChats();
+          switchChat("bist", document.querySelector(".chat-item"));
+        })
+        .catch(err => {
+          document.getElementById("output").innerText = err.message;
+        });
+    }
+
+    function getDisplayName(uid, callback) {
+      if (displayNameMap[uid]) {
+        callback(displayNameMap[uid]);
+      } else {
+        get(ref(db, "profiles/" + uid)).then(snap => {
+          const name = snap.val()?.name || "Sconosciuto";
+          displayNameMap[uid] = name;
+          callback(name);
+        });
+      }
+    }
+
+    function sendMessage() {
+      const text = document.getElementById("msg").value.trim();
+      if (!text) return;
+      set(ref(db, "chats/" + currentChat + "/" + Date.now()), {
+        uid: currentUser.uid,
+        msg: text,
+        time: Date.now()
+      });
+      document.getElementById("msg").value = "";
+    }
+
+    function loadMessages(chatId) {
+      const area = document.getElementById("chat-area");
+      area.innerHTML = "";
+
+      if (messageListeners[chatId]) {
+        off(ref(db, "chats/" + chatId), "child_added", messageListeners[chatId]);
+      }
+
+      const callback = snap => {
+        const data = snap.val();
+        getDisplayName(data.uid, name => {
+          const msgDiv = document.createElement("div");
+          const time = new Date(data.time).toLocaleString();
+          msgDiv.textContent = `${name}: ${data.msg} [${time}]`;
+          area.appendChild(msgDiv);
+          area.scrollTop = area.scrollHeight;
+        });
+      };
+
+      messageListeners[chatId] = callback;
+      onChildAdded(ref(db, "chats/" + chatId), callback);
+    }
+
+    function loadChats() {
+      const list = document.getElementById("chat-list");
+      list.innerHTML = "";
+      const bist = document.createElement("div");
+      bist.textContent = "BIST Chat";
+      bist.className = "chat-item active";
+      bist.onclick = () => switchChat("bist", bist);
+      list.appendChild(bist);
+
+      get(ref(db, "users/" + currentUser.uid + "/chats")).then(snap => {
+        const chats = snap.val();
+        if (chats) {
+          Object.keys(chats).forEach(chatId => {
+            const item = document.createElement("div");
+            item.textContent = chats[chatId];
+            item.className = "chat-item";
+            item.onclick = () => switchChat(chatId, item);
+            list.appendChild(item);
+          });
+        }
+      });
+    }
+
+    function switchChat(chatId, element) {
+      document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
+      element.classList.add("active");
+      get(ref(db, "profiles" + "/" + chatId)).then(snap => {
+        if (chatId === "bist") {
+          document.getElementById("chat-name").innerText = "BIST Chat";
+        } else if (snap.exists()) {
+          document.getElementById("chat-name").innerText = snap.val().name || chatId;
+        } else {
+          document.getElementById("chat-name").innerText = chatId;
+        }
+      });
+      currentChat = chatId;
+      loadMessages(chatId);
+    }
+
+    function addUserChat() {
+      const email = prompt("Inserisci l'email dell'utente con cui vuoi chattare");
+      if (!email) return;
+
+      const chatId = [currentUser.email, email].sort().join("_");
+
+      set(ref(db, "users/" + currentUser.uid + "/chats/" + chatId), email);
+
+      get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
+        if (snap.exists()) {
+          const otherUid = Object.keys(snap.val())[0];
+          set(ref(db, "users/" + otherUid + "/chats/" + chatId), currentUser.email);
+        }
+      });
+
+      loadChats();
+    }
+
+    function changeDisplayName() {
+      const newName = prompt("Inserisci il tuo nuovo nome utente visibile:");
+      if (!newName || !currentUser) return;
+      set(ref(db, "profiles/" + currentUser.uid + "/name"), newName);
+      displayNameMap[currentUser.uid] = newName;
+    }
+
+    function logout() {
+      signOut(auth).then(() => {
+        document.getElementById("app").style.display = "none";
+        document.getElementById("login").style.display = "block";
+        document.getElementById("email").value = "";
+        document.getElementById("password").value = "";
+        document.getElementById("output").innerText = "";
+        currentUser = null;
+        currentChat = "bist";
+        Object.keys(messageListeners).forEach(chatId => {
+          off(ref(db, "chats/" + chatId), "child_added", messageListeners[chatId]);
+        });
+        messageListeners = {};
+      }).catch(err => {
+        alert("Errore durante il logout: " + err.message);
+      });
+    }
+  </script>
+</head>
+<body>
+  <div id="login">
+    <h2>Accedi a BIST Chat</h2>
+    <input id="email" type="email" placeholder="Email"><br>
+    <input id="password" type="password" placeholder="Password"><br>
+    <button id="login-btn">Login</button>
+    <p id="output"></p>
+  </div>
+
+  <div id="app" style="display:none; width:100%;">
+    <div id="sidebar">
+      <h3>Chat</h3>
+      <div id="chat-list"></div>
+    </div>
+    <div id="main">
+      <div id="chat-header">
+        <span id="chat-name">BIST Chat</span>
+        <div>
+          <button id="add-btn">+ Aggiungi utente</button>
+          <button id="name-btn">Modifica nome</button>
+          <button id="logout-btn">Logout</button>
+        </div>
+      </div>
+      <div id="chat-area"></div>
+      <div id="chat-input">
+        <input id="msg" placeholder="Scrivi un messaggio">
+        <button id="send-btn">Invia</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
