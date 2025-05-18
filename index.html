@@ -148,8 +148,11 @@
 
     function switchChat(chatId, element) {
       document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
-      element.classList.add("active");
-      document.getElementById("chat-name").innerText = chatId === "bist" ? "BIST Chat" : chatId;
+      if (element) element.classList.add("active");
+      get(ref(db, "users/" + currentUser.uid + "/chats/" + chatId)).then(snap => {
+        const name = chatId === "bist" ? "BIST Chat" : snap.val() || chatId;
+        document.getElementById("chat-name").innerText = name;
+      });
       currentChat = chatId;
       loadMessages(chatId);
     }
@@ -160,16 +163,16 @@
 
       const chatId = [currentUser.email, email].sort().join("_");
 
-      set(ref(db, "users/" + currentUser.uid + "/chats/" + chatId), email)
-        .then(() => {
-          get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
-            if (snap.exists()) {
-              const otherUid = Object.keys(snap.val())[0];
-              set(ref(db, "users/" + otherUid + "/chats/" + chatId), currentUser.email);
-            }
-            loadChats();
-          });
-        });
+      get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
+        if (snap.exists()) {
+          const otherUid = Object.keys(snap.val())[0];
+          set(ref(db, "users/" + currentUser.uid + "/chats/" + chatId), email)
+            .then(() => set(ref(db, "users/" + otherUid + "/chats/" + chatId), currentUser.email))
+            .then(() => loadChats());
+        } else {
+          alert("Utente non trovato.");
+        }
+      });
     }
 
     function changeDisplayName() {
