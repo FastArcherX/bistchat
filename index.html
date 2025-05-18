@@ -161,6 +161,11 @@
       const email = prompt("Inserisci l'email dell'utente con cui vuoi chattare");
       if (!email) return;
 
+      if (email === currentUser.email) {
+        alert("Non puoi creare una chat con te stesso.");
+        return;
+      }
+
       const chatId = [currentUser.email, email].sort().join("_");
 
       get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
