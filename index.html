@@ -55,18 +55,22 @@
         .then(userCred => {
           currentUser = userCred.user;
           get(ref(db, "profiles/" + currentUser.uid)).then(snap => {
-            if (!snap.exists()) {
-              const name = prompt("Inserisci il tuo nome utente visibile:");
+            if (!snap.exists() || !snap.val()?.name) {
+              let name = "";
+              while (!name) {
+                name = prompt("Inserisci il tuo nome utente visibile (obbligatorio):");
+              }
               set(ref(db, "profiles/" + currentUser.uid), {
                 email: currentUser.email,
                 name: name
               });
             }
+          }).then(() => {
+            document.getElementById("login").style.display = "none";
+            document.getElementById("app").style.display = "flex";
+            loadChats();
+            switchChat("bist", document.querySelector(".chat-item"));
           });
-          document.getElementById("login").style.display = "none";
-          document.getElementById("app").style.display = "flex";
-          loadChats();
-          switchChat("bist", document.querySelector(".chat-item"));
         })
         .catch(err => {
           document.getElementById("output").innerText = err.message;
@@ -109,7 +113,7 @@
         getDisplayName(data.uid, name => {
           const msgDiv = document.createElement("div");
           const time = new Date(data.time).toLocaleString();
-          msgDiv.textContent = `${name}: ${data.msg} [${time}]`;
+          msgDiv.textContent = `[${time}] ${name}: ${data.msg}`;
           area.appendChild(msgDiv);
           area.scrollTop = area.scrollHeight;
         });
@@ -145,15 +149,7 @@
     function switchChat(chatId, element) {
       document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
       element.classList.add("active");
-      get(ref(db, "profiles" + "/" + chatId)).then(snap => {
-        if (chatId === "bist") {
-          document.getElementById("chat-name").innerText = "BIST Chat";
-        } else if (snap.exists()) {
-          document.getElementById("chat-name").innerText = snap.val().name || chatId;
-        } else {
-          document.getElementById("chat-name").innerText = chatId;
-        }
-      });
+      document.getElementById("chat-name").innerText = chatId === "bist" ? "BIST Chat" : chatId;
       currentChat = chatId;
       loadMessages(chatId);
     }
@@ -164,16 +160,16 @@
 
       const chatId = [currentUser.email, email].sort().join("_");
 
-      set(ref(db, "users/" + currentUser.uid + "/chats/" + chatId), email);
-
-      get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
-        if (snap.exists()) {
-          const otherUid = Object.keys(snap.val())[0];
-          set(ref(db, "users/" + otherUid + "/chats/" + chatId), currentUser.email);
-        }
-      });
-
-      loadChats();
+      set(ref(db, "users/" + currentUser.uid + "/chats/" + chatId), email)
+        .then(() => {
+          get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
+            if (snap.exists()) {
+              const otherUid = Object.keys(snap.val())[0];
+              set(ref(db, "users/" + otherUid + "/chats/" + chatId), currentUser.email);
+            }
+            loadChats();
+          });
+        });
     }
 
     function changeDisplayName() {
