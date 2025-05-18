@@ -166,42 +166,37 @@
       loadMessages(chatId);
     }
 
-    function safeEmail(email) {
-  return email.replace(/[.#$[\]]/g, '_');
-}
-
-function addUserChat() {
-  const email = prompt("Inserisci l'email dell'utente con cui vuoi chattare");
-  if (!email || email === currentUser.email) {
-    alert("Non puoi avviare una chat con te stesso.");
-    return;
-  }
-
-  const chatId = [safeEmail(currentUser.email), safeEmail(email)].sort().join("_");
-
-  // Verifica se la chat esiste già
-  get(ref(db, "users/" + currentUser.uid + "/chats/" + chatId)).then(snapshot => {
-    if (snapshot.exists()) {
-      alert("Hai già una chat con questo utente.");
-      return;
-    }
-
-    // Salva la chat per l'utente attuale
-    set(ref(db, "users/" + currentUser.uid + "/chats/" + chatId), email).then(() => {
-      // Trova l'altro utente
+    function addUserChat() {
+      const email = prompt("Inserisci l'email dell'utente con cui vuoi chattare");
+      if (!email) return;
+      if (email === currentUser.email) {
+        alert("Non puoi creare una chat con te stesso.");
+        return;
+      }
+      const safeCurrent = safeEmail(currentUser.email);
+      const safeOther = safeEmail(email);
+      const chatId = [safeCurrent, safeOther].sort().join("_");
       get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
         if (snap.exists()) {
           const otherUid = Object.keys(snap.val())[0];
-          set(ref(db, "users/" + otherUid + "/chats/" + chatId), currentUser.email).then(() => {
+          Promise.all([
+            set(ref(db, "users/" + currentUser.uid + "/chats/" + chatId), email),
+            set(ref(db, "users/" + otherUid + "/chats/" + chatId), currentUser.email),
+            set(ref(db, "chats/" + chatId), {})
+          ]).then(() => {
             loadChats();
+            setTimeout(() => {
+              const newChatElement = Array.from(document.querySelectorAll(".chat-item")).find(e => e.textContent === email);
+              if (newChatElement) {
+                switchChat(chatId, newChatElement);
+              }
+            }, 500);
           });
         } else {
-          alert("Utente non trovato nel database.");
+          alert("Utente non trovato.");
         }
       });
-    });
-  });
-}
+    }
 
     function changeDisplayName() {
       const newName = prompt("Inserisci il tuo nuovo nome utente visibile:");
