@@ -115,18 +115,6 @@
      }
      });
 
-    function sendMessage() {
-      const text = document.getElementById("msg").value.trim();
-      if (!text) return;
-      const timestamp = Date.now();
-      set(ref(db, "chats/" + currentChat + "/" + timestamp), {
-        uid: currentUser.uid,
-        msg: text,
-        time: timestamp
-      });
-      document.getElementById("msg").value = "";
-    }
-
     function loadMessages(chatId) {
       const area = document.getElementById("chat-area");
       area.innerHTML = "";
