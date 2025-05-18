@@ -66,7 +66,7 @@
             if (!snap.exists() || !snap.val()?.name) {
               let name = "";
               while (!name) {
-                name = prompt("Inserisci il tuo nome utente visibile (obbligatorio):");
+                name = prompt("Insert your nickname (mandatory):");
               }
               set(ref(db, "profiles/" + currentUser.uid), {
                 email: currentUser.email,
@@ -90,7 +90,7 @@
         callback(displayNameMap[uid]);
       } else {
         get(ref(db, "profiles/" + uid)).then(snap => {
-          const name = snap.val()?.name || "Sconosciuto";
+          const name = snap.val()?.name || "Unknow User";
           displayNameMap[uid] = name;
           callback(name);
         });
@@ -168,10 +168,10 @@
     }
 
     function addUserChat() {
-      const email = prompt("Inserisci l'email dell'utente con cui vuoi chattare");
+      const email = prompt("Insert the email of the user you want to chat with:");
       if (!email) return;
       if (email === currentUser.email) {
-        alert("Non puoi creare una chat con te stesso.");
+        alert("You can't create a chat with yourself!");
         return;
       }
       const safeCurrent = safeEmail(currentUser.email);
@@ -194,13 +194,13 @@
             }, 500);
           });
         } else {
-          alert("Utente non trovato.");
+          alert("User not found...");
         }
       });
     }
 
     function changeDisplayName() {
-      const newName = prompt("Inserisci il tuo nuovo nome utente visibile:");
+      const newName = prompt("Insert your new nickname:");
       if (!newName || !currentUser) return;
       set(ref(db, "profiles/" + currentUser.uid + "/name"), newName);
       displayNameMap[currentUser.uid] = newName;
@@ -220,14 +220,14 @@
         });
         messageListeners = {};
       }).catch(err => {
-        alert("Errore durante il logout: " + err.message);
+        alert("Error during the logout: " + err.message);
       });
     }
   </script>
 </head>
 <body>
   <div id="login">
-    <h2>Accedi a BIST Chat</h2>
+    <h2>Login into BIST Chat</h2>
     <input id="email" type="email" placeholder="Email"><br>
     <input id="password" type="password" placeholder="Password"><br>
     <button id="login-btn">Login</button>
@@ -237,21 +237,21 @@
     <div id="sidebar">
       <h3>Chat</h3>
       <div id="chat-list"></div>
-      <div id="version">beta-0.1.01</div>
+      <div id="version">beta-0.1.03</div>
     </div>
     <div id="main">
       <div id="chat-header">
         <span id="chat-name">BIST Chat</span>
         <div>
-          <button id="add-btn">+ Aggiungi utente</button>
-          <button id="name-btn">Modifica nome</button>
-          <button id="logout-btn">Logout</button>
+          <button id="add-btn">➕ Add User</button>
+          <button id="name-btn">✏️ Edit Nickname</button>
+          <button id="logout-btn">🚪 Logout</button>
         </div>
       </div>
       <div id="chat-area"></div>
       <div id="chat-input">
-        <input id="msg" placeholder="Scrivi un messaggio" maxlength="300">
-        <button id="send-btn">Invia</button>
+        <input id="msg" placeholder="Write a message" maxlength="300">
+        <button id="send-btn">Send</button>
       </div>
     </div>
   </div>
