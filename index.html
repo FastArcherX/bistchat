@@ -22,7 +22,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getDatabase, ref, set, get, onChildAdded, off, orderByChild, query, equalTo } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+    import { getDatabase, ref, set, get, onChildAdded, off, orderByChild, query, equalTo, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAKA15Li2IOnKKFrR7JAWw1SOPD31eIYZU",
@@ -145,6 +145,16 @@
             item.textContent = chats[chatId];
             item.className = "chat-item";
             item.onclick = () => switchChat(chatId, item);
+            item.oncontextmenu = (e) => {
+              e.preventDefault();
+              if (confirm("Vuoi davvero eliminare questa chat?")) {
+                remove(ref(db, "users/" + currentUser.uid + "/chats/" + chatId));
+                if (currentChat === chatId) {
+                  switchChat("bist", document.querySelector(".chat-item"));
+                }
+                item.remove();
+              }
+            };
             list.appendChild(item);
           });
         }
