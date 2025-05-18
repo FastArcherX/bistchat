@@ -1,1 +1,1 @@
-fastarcherx.gihub.io/bistchat
+https://fastarcherx.gihub.io/bistchat/
