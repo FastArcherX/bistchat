@@ -145,16 +145,6 @@
             item.textContent = chats[chatId];
             item.className = "chat-item";
             item.onclick = () => switchChat(chatId, item);
-            item.oncontextmenu = (e) => {
-              e.preventDefault();
-              if (confirm("Vuoi davvero eliminare questa chat?")) {
-                remove(ref(db, "users/" + currentUser.uid + "/chats/" + chatId));
-                if (currentChat === chatId) {
-                  switchChat("bist", document.querySelector(".chat-item"));
-                }
-                item.remove();
-              }
-            };
             list.appendChild(item);
           });
         }
@@ -175,14 +165,11 @@
     function addUserChat() {
       const email = prompt("Inserisci l'email dell'utente con cui vuoi chattare");
       if (!email) return;
-
       if (email === currentUser.email) {
         alert("Non puoi creare una chat con te stesso.");
         return;
       }
-
       const chatId = [currentUser.email, email].sort().join("_");
-
       get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
         if (snap.exists()) {
           const otherUid = Object.keys(snap.val())[0];
@@ -192,7 +179,12 @@
             set(ref(db, "chats/" + chatId), {})
           ]).then(() => {
             loadChats();
-            switchChat(chatId);
+            setTimeout(() => {
+              const newChatElement = Array.from(document.querySelectorAll(".chat-item")).find(e => e.textContent === email);
+              if (newChatElement) {
+                switchChat(chatId, newChatElement);
+              }
+            }, 500);
           });
         } else {
           alert("Utente non trovato.");
@@ -234,12 +226,11 @@
     <button id="login-btn">Login</button>
     <p id="output"></p>
   </div>
-
   <div id="app" style="display:none; width:100%;">
     <div id="sidebar">
       <h3>Chat</h3>
       <div id="chat-list"></div>
-      <div id="version">beta-0.1.02</div>
+      <div id="version">beta-0.1.01</div>
     </div>
     <div id="main">
       <div id="chat-header">
