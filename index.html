@@ -10,7 +10,16 @@
     #main { flex: 1; display: flex; flex-direction: column; }
     #chat-header { background: #ddd; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
     #chat-area { flex: 1; padding: 10px; overflow-y: auto; background: #fff; }
-    #chat-input { display: flex; padding: 10px; background: #eee; }
+    #chat-input textarea {
+  width: 100%;                 /* larghezza iniziale */
+  min-height: 40px;            /* altezza iniziale (equivalente a ~2 righe) */
+  max-height: 120px;           /* altezza massima */
+  resize: none;                /* blocca il resize manuale */
+  overflow-y: auto;            /* barra verticale se necessario */
+  overflow-x: auto;            /* barra orizzontale se necessario */
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
     #chat-input input { flex: 1; padding: 5px; }
     #chat-input button { padding: 5px 10px; }
     #login { padding: 20px; }
@@ -113,6 +122,10 @@
       e.preventDefault();
       sendMessage();
      }
+     });
+    document.getElementById("msg").addEventListener("input", function () {
+      this.style.height = "auto"; // resetta
+      this.style.height = Math.min(this.scrollHeight, 120) + "px"; // si espande fino a 120px
      });
 
     function loadMessages(chatId) {
