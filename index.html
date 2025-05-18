@@ -15,6 +15,8 @@
     #login { padding: 20px; }
     .chat-item { padding: 5px; cursor: pointer; border-bottom: 1px solid #ccc; }
     .chat-item.active { background: #ddd; }
+    .message-own { text-align: right; }
+    .message { margin-bottom: 5px; }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -112,6 +114,7 @@
         const data = snap.val();
         getDisplayName(data.uid, name => {
           const msgDiv = document.createElement("div");
+          msgDiv.className = "message" + (data.uid === currentUser.uid ? " message-own" : "");
           const time = new Date(data.time).toLocaleString();
           msgDiv.textContent = `[${time}] ${name}: ${data.msg}`;
           area.appendChild(msgDiv);
