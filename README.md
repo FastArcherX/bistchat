@@ -1,1 +1,1 @@
-https://fastarcherx.gihub.io/bistchat/
+https://fastarcherx.github.io/bistchat/
