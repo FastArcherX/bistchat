@@ -19,8 +19,154 @@
     .message { margin-bottom: 5px; }
     #version { position: absolute; bottom: 10px; left: 10px; font-size: 12px; color: #888; }
   </style>
-<script>
-function safeEmail(email) {
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getDatabase, ref, set, get, onChildAdded, off, orderByChild, query, equalTo, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAKA15Li2IOnKKFrR7JAWw1SOPD31eIYZU",
+      authDomain: "bist-chat.firebaseapp.com",
+      databaseURL: "https://bist-chat-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "bist-chat",
+      storageBucket: "bist-chat.firebasestorage.app",
+      messagingSenderId: "1009316312831",
+      appId: "1:1009316312831:web:67996e1e45f7e6498afeca"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    let currentUser = null;
+    let currentChat = "bist";
+    let messageListeners = {};
+    let displayNameMap = {};
+
+    window.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("login-btn").onclick = login;
+      document.getElementById("send-btn").onclick = sendMessage;
+      document.getElementById("add-btn").onclick = addUserChat;
+      document.getElementById("name-btn").onclick = changeDisplayName;
+      document.getElementById("logout-btn").onclick = logout;
+    });
+
+    function safeEmail(str) {
+      return str.replace(/[.#$\[\]]/g, '_');
+    }
+
+    function login() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      signInWithEmailAndPassword(auth, email, password)
+        .then(userCred => {
+          currentUser = userCred.user;
+          get(ref(db, "profiles/" + currentUser.uid)).then(snap => {
+            if (!snap.exists() || !snap.val()?.name) {
+              let name = "";
+              while (!name) {
+                name = prompt("Inserisci il tuo nome utente visibile (obbligatorio):");
+              }
+              set(ref(db, "profiles/" + currentUser.uid), {
+                email: currentUser.email,
+                name: name
+              });
+            }
+          }).then(() => {
+            document.getElementById("login").style.display = "none";
+            document.getElementById("app").style.display = "flex";
+            loadChats();
+            switchChat("bist", document.querySelector(".chat-item"));
+          });
+        })
+        .catch(err => {
+          document.getElementById("output").innerText = err.message;
+        });
+    }
+
+    function getDisplayName(uid, callback) {
+      if (displayNameMap[uid]) {
+        callback(displayNameMap[uid]);
+      } else {
+        get(ref(db, "profiles/" + uid)).then(snap => {
+          const name = snap.val()?.name || "Sconosciuto";
+          displayNameMap[uid] = name;
+          callback(name);
+        });
+      }
+    }
+
+    function sendMessage() {
+      const text = document.getElementById("msg").value.trim();
+      if (!text) return;
+      const timestamp = Date.now();
+      set(ref(db, "chats/" + currentChat + "/" + timestamp), {
+        uid: currentUser.uid,
+        msg: text,
+        time: timestamp
+      });
+      document.getElementById("msg").value = "";
+    }
+
+    function loadMessages(chatId) {
+      const area = document.getElementById("chat-area");
+      area.innerHTML = "";
+
+      if (messageListeners[chatId]) {
+        off(ref(db, "chats/" + chatId), "child_added", messageListeners[chatId]);
+      }
+
+      const callback = snap => {
+        const data = snap.val();
+        getDisplayName(data.uid, name => {
+          const msgDiv = document.createElement("div");
+          msgDiv.className = "message" + (data.uid === currentUser.uid ? " message-own" : "");
+          const time = new Date(data.time).toLocaleString();
+          msgDiv.textContent = `[${time}] ${name}: ${data.msg}`;
+          area.appendChild(msgDiv);
+          area.scrollTop = area.scrollHeight;
+        });
+      };
+
+      messageListeners[chatId] = callback;
+      onChildAdded(ref(db, "chats/" + chatId), callback);
+    }
+
+    function loadChats() {
+      const list = document.getElementById("chat-list");
+      list.innerHTML = "";
+      const bist = document.createElement("div");
+      bist.textContent = "BIST Chat";
+      bist.className = "chat-item active";
+      bist.onclick = () => switchChat("bist", bist);
+      list.appendChild(bist);
+
+      get(ref(db, "users/" + currentUser.uid + "/chats")).then(snap => {
+        const chats = snap.val();
+        if (chats) {
+          Object.keys(chats).forEach(chatId => {
+            const item = document.createElement("div");
+            item.textContent = chats[chatId];
+            item.className = "chat-item";
+            item.onclick = () => switchChat(chatId, item);
+            list.appendChild(item);
+          });
+        }
+      });
+    }
+
+    function switchChat(chatId, element) {
+      document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
+      if (element) element.classList.add("active");
+      get(ref(db, "users/" + currentUser.uid + "/chats/" + chatId)).then(snap => {
+        const name = chatId === "bist" ? "BIST Chat" : snap.val() || chatId;
+        document.getElementById("chat-name").innerText = name;
+      });
+      currentChat = chatId;
+      loadMessages(chatId);
+    }
+
+    function safeEmail(email) {
   return email.replace(/[.#$[\]]/g, '_');
 }
 
@@ -33,13 +179,16 @@ function addUserChat() {
 
   const chatId = [safeEmail(currentUser.email), safeEmail(email)].sort().join("_");
 
+  // Verifica se la chat esiste già
   get(ref(db, "users/" + currentUser.uid + "/chats/" + chatId)).then(snapshot => {
     if (snapshot.exists()) {
       alert("Hai già una chat con questo utente.");
       return;
     }
 
+    // Salva la chat per l'utente attuale
     set(ref(db, "users/" + currentUser.uid + "/chats/" + chatId), email).then(() => {
+      // Trova l'altro utente
       get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
         if (snap.exists()) {
           const otherUid = Object.keys(snap.val())[0];
@@ -53,7 +202,32 @@ function addUserChat() {
     });
   });
 }
-</script>
+
+    function changeDisplayName() {
+      const newName = prompt("Inserisci il tuo nuovo nome utente visibile:");
+      if (!newName || !currentUser) return;
+      set(ref(db, "profiles/" + currentUser.uid + "/name"), newName);
+      displayNameMap[currentUser.uid] = newName;
+    }
+
+    function logout() {
+      signOut(auth).then(() => {
+        document.getElementById("app").style.display = "none";
+        document.getElementById("login").style.display = "block";
+        document.getElementById("email").value = "";
+        document.getElementById("password").value = "";
+        document.getElementById("output").innerText = "";
+        currentUser = null;
+        currentChat = "bist";
+        Object.keys(messageListeners).forEach(chatId => {
+          off(ref(db, "chats/" + chatId), "child_added", messageListeners[chatId]);
+        });
+        messageListeners = {};
+      }).catch(err => {
+        alert("Errore durante il logout: " + err.message);
+      });
+    }
+  </script>
 </head>
 <body>
   <div id="login">
