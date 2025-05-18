@@ -96,6 +96,24 @@
         });
       }
     }
+    function sendMessage() {
+      const text = document.getElementById("msg").value.trim();
+      if (!text) return;
+      const timestamp = Date.now();
+      set(ref(db, "chats/" + currentChat + "/" + timestamp), {
+         uid: currentUser.uid,
+         msg: text,
+         time: timestamp
+       });
+       document.getElementById("msg").value = "";
+     }
+
+    document.getElementById("msg").addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+     }
+     });
 
     function sendMessage() {
       const text = document.getElementById("msg").value.trim();
