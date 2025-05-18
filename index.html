@@ -94,10 +94,11 @@
     function sendMessage() {
       const text = document.getElementById("msg").value.trim();
       if (!text) return;
-      set(ref(db, "chats/" + currentChat + "/" + Date.now()), {
+      const timestamp = Date.now();
+      set(ref(db, "chats/" + currentChat + "/" + timestamp), {
         uid: currentUser.uid,
         msg: text,
-        time: Date.now()
+        time: timestamp
       });
       document.getElementById("msg").value = "";
     }
@@ -234,7 +235,7 @@
       </div>
       <div id="chat-area"></div>
       <div id="chat-input">
-        <input id="msg" placeholder="Scrivi un messaggio">
+        <input id="msg" placeholder="Scrivi un messaggio" maxlength="300">
         <button id="send-btn">Invia</button>
       </div>
     </div>
