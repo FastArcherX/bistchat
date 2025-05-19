@@ -11,7 +11,11 @@
     font-family: 'Courier New', monospace;
     margin: 0;
     height: 100vh;
+  }
+
+  #app {
     display: flex;
+    height: 100vh;
   }
 
   #sidebar {
@@ -57,7 +61,7 @@
   #chat-input textarea {
     flex: 1;
     width: 100%;
-    min-height: 40px;
+    min-height: 41px;
     max-height: 120px;
     resize: none;
     overflow-y: auto;
@@ -75,6 +79,16 @@
   #chat-input button {
     background-color: transparent;
     color: #00ff00;
+    border: 2px solid #00ff00;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    padding: 10px 10px;
+  }
+  
+  #chat-input button:hover {
+    background-color: #006000;
+    color: #ffffff;
     border: 2px solid #00ff00;
     cursor: pointer;
     font-family: 'Courier New', monospace;
@@ -132,6 +146,14 @@
     color: #00ff00;
     user-select: none;
   }
+  .chat-item:hover {
+    padding: 5px;
+    cursor: pointer;
+    border-bottom: 1px solid #00ff00;
+    color: #ffffff;
+    background: #006000;
+    user-select: none;
+  }
 
   .chat-item.active {
     cursor: pointer;
@@ -155,13 +177,14 @@
   cursor: pointer;
   font-family: 'Courier New', monospace;
   font-size: 16px;
-  padding: 10px 10px;
+  padding: 5x 10px;
   margin-left: 5px;
 }
 
 .chat-button:hover {
-  background-color: #00ff00;
-  color: black;
+  background-color: #006000;
+  border: 2px solid #00ff00;
+  color: #ffffff;
 }
 
   #version {
@@ -171,7 +194,7 @@
     font-size: 12px;
     color: #00ff00;
   }
-   #chat-loader {
+  #chat-loader {
   position: absolute;
   top: 0;
   left: 0;
@@ -276,17 +299,20 @@
         });
       }
     }
-    function sendMessage() {
-      const text = document.getElementById("msg").value.trim();
-      if (!text) return;
-      const timestamp = Date.now();
-      set(ref(db, "chats/" + currentChat + "/" + timestamp), {
-         uid: currentUser.uid,
-         msg: text,
-         time: timestamp
-       });
-       document.getElementById("msg").value = "";
-     }
+function sendMessage() {
+  const textarea = document.getElementById("msg");
+  const text = textarea.value.trim();
+  if (!text) return;
+  const timestamp = Date.now();
+  set(ref(db, "chats/" + currentChat + "/" + timestamp), {
+     uid: currentUser.uid,
+     msg: text,
+     time: timestamp
+   });
+   textarea.value = "";
+   textarea.style.height = textarea.style.minHeight;
+ }
+
 
     document.getElementById("msg").addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -299,30 +325,38 @@
       this.style.height = Math.min(this.scrollHeight, 120) + "px"; // si espande fino a 120px
      });
 
-    function loadMessages(chatId) {
-      const area = document.getElementById("chat-messages");
-area.innerHTML = "";
+function loadMessages(chatId) {
+  const area = document.getElementById("chat-messages");
+  area.innerHTML = "";
 
-      if (messageListeners[chatId]) {
-        off(ref(db, "chats/" + chatId), "child_added", messageListeners[chatId]);
-      }
+  if (messageListeners[chatId]) {
+    off(ref(db, "chats/" + chatId), "child_added", messageListeners[chatId]);
+  }
 
-      const callback = snap => {
-        const data = snap.val();
-        getDisplayName(data.uid, name => {
-          const msgDiv = document.createElement("div");
-          msgDiv.className = "message" + (data.uid === currentUser.uid ? " message-own" : "");
-          const time = new Date(data.time).toLocaleString();
-          msgDiv.textContent = `[${time}] ${name}: ${data.msg}`;
-          area.appendChild(msgDiv);
-          area.scrollTop = area.scrollHeight;
-	  hideChatLoading(); // ← nasconde il loader e riattiva l'input
-        });
-      };
+  const chatRef = ref(db, "chats/" + chatId);
+  const callback = snap => {
+    const data = snap.val();
+    getDisplayName(data.uid, name => {
+      const msgDiv = document.createElement("div");
+      msgDiv.className = "message" + (data.uid === currentUser.uid ? " message-own" : "");
+      const time = new Date(data.time).toLocaleString();
+      msgDiv.textContent = `[${time}] ${name}: ${data.msg}`;
+      area.appendChild(msgDiv);
+      area.scrollTop = area.scrollHeight;
+      hideChatLoading(); // Nasconde il loader appena arriva un messaggio
+    });
+  };
 
-      messageListeners[chatId] = callback;
-      onChildAdded(ref(db, "chats/" + chatId), callback);
+  messageListeners[chatId] = callback;
+  onChildAdded(chatRef, callback);
+
+  // Controlla se la chat è vuota o non esiste e nasconde il loader
+  get(chatRef).then(snap => {
+    if (!snap.exists() || Object.keys(snap.val() || {}).length === 0) {
+      hideChatLoading();  // Nasconde il loader se non ci sono messaggi
     }
+  });
+}
 
     function loadChats() {
       const list = document.getElementById("chat-list");
@@ -428,21 +462,18 @@ function hideChatLoading() {
 
     function logout() {
       signOut(auth).then(() => {
-        document.getElementById("app").style.display = "none";
-        document.getElementById("login").style.display = "block";
-        document.getElementById("email").value = "";
-        document.getElementById("password").value = "";
-        document.getElementById("output").innerText = "";
-        currentUser = null;
-        currentChat = "bist";
-        Object.keys(messageListeners).forEach(chatId => {
-          off(ref(db, "chats/" + chatId), "child_added", messageListeners[chatId]);
-        });
-        messageListeners = {};
-      }).catch(err => {
-        alert("Error during the logout: " + err.message);
-      });
-    }
+      document.getElementById("app").style.display = "none";
+      document.getElementById("login").style.display = "flex";
+      document.getElementById("email").value = "";
+      document.getElementById("password").value = "";
+      currentUser = null;
+      currentChat = "bist";
+      Object.values(messageListeners).forEach(listener => off(listener));
+      messageListeners = {};
+      displayNameMap = {};
+      document.getElementById("chat-messages").innerHTML = "";
+    });
+  }
   </script>
 </head>
 <body>
@@ -457,7 +488,7 @@ function hideChatLoading() {
     <div id="sidebar">
       <h3>Chats</h3>
       <div id="chat-list"></div>
-      <div id="version">beta-0.1.07 (002)</div>
+      <div id="version">beta-0.2.00(fix-000)</div>
     </div>
     <div id="main">
       <div id="chat-header">
