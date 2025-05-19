@@ -292,12 +292,19 @@
         const chats = snap.val();
         if (chats) {
           Object.keys(chats).forEach(chatId => {
-            const item = document.createElement("div");
-            item.textContent = chats[chatId];
-            item.className = "chat-item";
-            item.onclick = () => switchChat(chatId, item);
-            list.appendChild(item);
-          });
+  const email = chats[chatId];
+  get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
+    const name = snap.exists()
+      ? Object.values(snap.val())[0].name
+      : email;
+
+    const item = document.createElement("div");
+    item.textContent = name;
+    item.className = "chat-item";
+    item.onclick = () => switchChat(chatId, item);
+    list.appendChild(item);
+  });
+});
         }
       });
     }
@@ -383,7 +390,7 @@
     <div id="sidebar">
       <h3>Chat</h3>
       <div id="chat-list"></div>
-      <div id="version">beta-0.1.05</div>
+      <div id="version">beta-0.1.06</div>
     </div>
     <div id="main">
       <div id="chat-header">
