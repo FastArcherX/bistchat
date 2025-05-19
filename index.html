@@ -147,6 +147,22 @@
     margin-bottom: 5px;
     white-space: pre-wrap;
   }
+	  
+  .chat-button {
+  background-color: transparent;
+  color: #00ff00;
+  border: 2px solid #00ff00;
+  cursor: pointer;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  padding: 10px 10px;
+  margin-left: 5px;
+}
+
+.chat-button:hover {
+  background-color: #00ff00;
+  color: black;
+}
 
   #version {
     position: absolute;
@@ -439,17 +455,17 @@ function hideChatLoading() {
   </div>
   <div id="app" style="display:none; width:100%;">
     <div id="sidebar">
-      <h3>Chat</h3>
+      <h3>Chats</h3>
       <div id="chat-list"></div>
-      <div id="version">beta-0.1.07 (001)</div>
+      <div id="version">beta-0.1.07 (002)</div>
     </div>
     <div id="main">
       <div id="chat-header">
         <span id="chat-name">BIST Chat</span>
         <div>
-          <button id="add-btn">➕ Add User</button>
-          <button id="name-btn">✏️ Edit Nickname</button>
-          <button id="logout-btn">🚪 Logout</button>
+	  <button id="add-btn" class="chat-button">➕ Add User</button>
+          <button id="name-btn" class="chat-button">✏️ Edit Nickname</button>
+          <button id="logout-btn" class="chat-button">🚪 Logout</button>
         </div>
       </div>
       <div id="chat-area" style="position: relative;">
@@ -459,7 +475,7 @@ function hideChatLoading() {
   </div>
 </div>
       <div id="chat-input">
-        <textarea id="msg" placeholder="Insert a message" rows="2"></textarea>
+        <textarea id="msg" placeholder="Insert a message..." rows="1"></textarea>
         <button id="send-btn">Send</button>
       </div>
     </div>
