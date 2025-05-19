@@ -159,7 +159,7 @@
       signInWithEmailAndPassword(auth, email, password)
         .then(userCred => {
           currentUser = userCred.user;
-          get(ref(db, "profiles/" + currentUser.uid)).then(snap => {bt
+          get(ref(db, "profiles/" + currentUser.uid)).then(snap => {
             if (!snap.exists() || !snap.val()?.name) {
               let name = "";
               while (!name) {
