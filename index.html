@@ -312,10 +312,19 @@
     function switchChat(chatId, element) {
       document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
       if (element) element.classList.add("active");
-      get(ref(db, "users/" + currentUser.uid + "/chats/" + chatId)).then(snap => {
-        const name = chatId === "bist" ? "BIST Chat" : snap.val() || chatId;
-        document.getElementById("chat-name").innerText = name;
-      });
+      if (chatId === "bist") {
+  document.getElementById("chat-name").innerText = "BIST Chat";
+} else {
+  get(ref(db, "users/" + currentUser.uid + "/chats/" + chatId)).then(snap => {
+    const email = snap.val();
+    get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap2 => {
+      const name = snap2.exists()
+        ? Object.values(snap2.val())[0].name
+        : email;
+      document.getElementById("chat-name").innerText = name;
+    });
+  });
+}
       currentChat = chatId;
       loadMessages(chatId);
     }
@@ -390,7 +399,7 @@
     <div id="sidebar">
       <h3>Chat</h3>
       <div id="chat-list"></div>
-      <div id="version">beta-0.1.06</div>
+      <div id="version">beta-0.1.06 (000)</div>
     </div>
     <div id="main">
       <div id="chat-header">
