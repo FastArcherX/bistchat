@@ -284,8 +284,8 @@
      });
 
     function loadMessages(chatId) {
-      const area = document.getElementById("chat-area");
-      area.innerHTML = "";
+      const area = document.getElementById("chat-messages");
+area.innerHTML = "";
 
       if (messageListeners[chatId]) {
         off(ref(db, "chats/" + chatId), "child_added", messageListeners[chatId]);
@@ -441,7 +441,7 @@ function hideChatLoading() {
     <div id="sidebar">
       <h3>Chat</h3>
       <div id="chat-list"></div>
-      <div id="version">beta-0.1.07 (000)</div>
+      <div id="version">beta-0.1.07 (001)</div>
     </div>
     <div id="main">
       <div id="chat-header">
@@ -453,6 +453,7 @@ function hideChatLoading() {
         </div>
       </div>
       <div id="chat-area" style="position: relative;">
+  <div id="chat-messages"></div>
   <div id="chat-loader">
     <div class="loader-text">Loading BIST Chat...</div>
   </div>
