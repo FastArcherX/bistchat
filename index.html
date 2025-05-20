@@ -329,12 +329,16 @@ function loadMessages(chatId) {
   const area = document.getElementById("chat-messages");
   area.innerHTML = "";
 
-  if (messageListeners[chatId]) {
-    off(ref(db, "chats/" + chatId), "child_added", messageListeners[chatId]);
-  }
+  // Rimuovi tutti i listener precedenti
+  Object.keys(messageListeners).forEach(id => {
+    off(ref(db, "chats/" + id), "child_added", messageListeners[id]);
+    delete messageListeners[id];
+  });
 
   const chatRef = ref(db, "chats/" + chatId);
   const callback = snap => {
+    // Mostra solo i messaggi della chat attiva
+    if (currentChat !== chatId) return;
     const data = snap.val();
     getDisplayName(data.uid, name => {
       const msgDiv = document.createElement("div");
@@ -405,18 +409,18 @@ function hideChatLoading() {
       document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
       if (element) element.classList.add("active");
       if (chatId === "bist") {
-  document.getElementById("chat-name").innerText = "BIST Chat";
-} else {
-  get(ref(db, "users/" + currentUser.uid + "/chats/" + chatId)).then(snap => {
-    const email = snap.val();
-    get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap2 => {
-      const name = snap2.exists()
-        ? Object.values(snap2.val())[0].name
-        : email;
-      document.getElementById("chat-name").innerText = name;
+    document.getElementById("chat-name").innerText = "BIST Chat";
+  } else {
+    get(ref(db, "users/" + currentUser.uid + "/chats/" + chatId)).then(snap => {
+      const email = snap.val();
+      get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap2 => {
+        const name = snap2.exists()
+          ? Object.values(snap2.val())[0].name
+          : email;
+        document.getElementById("chat-name").innerText = name;
+      });
     });
-  });
-}
+  }
       currentChat = chatId;
       loadMessages(chatId);
     }
@@ -488,7 +492,7 @@ function hideChatLoading() {
     <div id="sidebar">
       <h3>Chats</h3>
       <div id="chat-list"></div>
-      <div id="version">beta-0.2.00(fix-000)</div>
+      <div id="version">beta-0.2.01(fix-000)</div>
     </div>
     <div id="main">
       <div id="chat-header">
