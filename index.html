@@ -145,6 +145,9 @@
     border-bottom: 1px solid #00ff00;
     color: #00ff00;
     user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
   .chat-item:hover {
     padding: 5px;
@@ -222,11 +225,101 @@
   border-color: #555;
   cursor: not-allowed;
 }
+
+.chat-notify {
+  min-width: 22px;
+  height: 22px;
+  background: #00ff00;
+  color: black;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: bold;
+  margin-left: 8px;
+  padding: 0 5px;
+  box-sizing: border-box;
+}
+
+.pin-emoji {
+  margin-right: 5px;
+}
+
+#custom-popup-bg {
+  position: fixed;
+  z-index: 1000;
+  left: 0; top: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+#custom-popup {
+  background: #111;
+  border: 2px solid #00ff00;
+  color: #00ff00;
+  font-family: 'Courier New', monospace;
+  padding: 30px 20px 20px 20px;
+  border-radius: 8px;
+  min-width: 320px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+#custom-popup input {
+  background: black;
+  color: #00ff00;
+  border: 2px solid #00ff00;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  padding: 8px;
+  margin: 10px 0;
+  width: 90%;
+}
+#custom-popup button {
+  background: transparent;
+  color: #00ff00;
+  border: 2px solid #00ff00;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  padding: 8px 18px;
+  margin: 5px;
+  cursor: pointer;
+}
+#custom-popup button:hover {
+  background: #006000;
+  color: #fff;
+}
+#custom-popup .popup-title {
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+#custom-popup .popup-error {
+  color: #ff3333;
+  font-size: 14px;
+  margin-top: 5px;
+}
+.date-divider {
+  color: #00ff00;
+  text-align: center;
+  margin: 18px 0 8px 0;
+  font-family: 'Courier New', monospace;
+  font-size: 15px;
+  opacity: 0.7;
+  user-select: none;
+}
 </style>
-  <script type="module">
+
+<div id="custom-popup-bg">
+  <div id="custom-popup"></div>
+</div>
+
+<script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getDatabase, ref, set, get, onChildAdded, off, orderByChild, query, equalTo, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+    import { getDatabase, ref, set, get, onChildAdded, off, orderByChild, query, equalTo, remove, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAKA15Li2IOnKKFrR7JAWw1SOPD31eIYZU",
@@ -259,6 +352,40 @@
       return str.replace(/[.#$\[\]]/g, '_');
     }
 
+    function showPopup({title, inputType, placeholder, okText, cancelText, onOk, onCancel, error}) {
+      const bg = document.getElementById("custom-popup-bg");
+      const popup = document.getElementById("custom-popup");
+      popup.innerHTML = `
+        <div class="popup-title">${title || ""}</div>
+        ${inputType ? `<input id="popup-input" type="${inputType}" placeholder="${placeholder || ""}">` : ""}
+        <div style="display:flex;gap:10px;margin-top:10px;">
+          <button id="popup-ok">${okText || "OK"}</button>
+          ${cancelText ? `<button id="popup-cancel">${cancelText}</button>` : ""}
+        </div>
+        <div class="popup-error">${error || ""}</div>
+      `;
+      bg.style.display = "flex";
+      setTimeout(() => {
+        const inp = document.getElementById("popup-input");
+        if (inp) inp.focus();
+      }, 100);
+      document.getElementById("popup-ok").onclick = () => {
+        const val = document.getElementById("popup-input")?.value;
+        bg.style.display = "none";
+        onOk && onOk(val);
+      };
+      if (cancelText) {
+        document.getElementById("popup-cancel").onclick = () => {
+          bg.style.display = "none";
+          onCancel && onCancel();
+        };
+      }
+    }
+
+    function showAlert(msg, cb) {
+      showPopup({title: msg, okText: "OK", onOk: cb});
+    }
+
     function login() {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
@@ -267,20 +394,34 @@
           currentUser = userCred.user;
           get(ref(db, "profiles/" + currentUser.uid)).then(snap => {
             if (!snap.exists() || !snap.val()?.name) {
-              let name = "";
-              while (!name) {
-                name = prompt("Insert your nickname (mandatory):");
+              function askName(errMsg) {
+                showPopup({
+                  title: "Insert your nickname (mandatory):",
+                  inputType: "text",
+                  okText: "OK",
+                  cancelText: null,
+                  error: errMsg || "",
+                  onOk: name => {
+                    if (!name) return askName("Nickname required!");
+                    set(ref(db, "profiles/" + currentUser.uid), {
+                      email: currentUser.email,
+                      name: name
+                    }).then(() => {
+                      document.getElementById("login").style.display = "none";
+                      document.getElementById("app").style.display = "flex";
+                      loadChats();
+                      switchChat("bist", document.querySelector(".chat-item"));
+                    });
+                  }
+                });
               }
-              set(ref(db, "profiles/" + currentUser.uid), {
-                email: currentUser.email,
-                name: name
-              });
+              askName();
+            } else {
+              document.getElementById("login").style.display = "none";
+              document.getElementById("app").style.display = "flex";
+              loadChats();
+              switchChat("bist", document.querySelector(".chat-item"));
             }
-          }).then(() => {
-            document.getElementById("login").style.display = "none";
-            document.getElementById("app").style.display = "flex";
-            loadChats();
-            switchChat("bist", document.querySelector(".chat-item"));
           });
         })
         .catch(err => {
@@ -299,190 +440,371 @@
         });
       }
     }
-function sendMessage() {
-  const textarea = document.getElementById("msg");
-  const text = textarea.value.trim();
-  if (!text) return;
-  const timestamp = Date.now();
-  set(ref(db, "chats/" + currentChat + "/" + timestamp), {
-     uid: currentUser.uid,
-     msg: text,
-     time: timestamp
-   });
-   textarea.value = "";
-   textarea.style.height = textarea.style.minHeight;
- }
 
+    function updateLastActive(chatId, isMessageEvent = false) {
+      if (chatId === "bist") return;
+      if (!isMessageEvent) return;
+      const now = Date.now();
+      set(ref(db, "chatMeta/" + chatId + "/lastActive"), now);
+    }
+
+    function incrementUnread(chatId, uid) {
+      if (chatId === "bist") return;
+      const unreadRef = ref(db, `chatMeta/${chatId}/unread/${uid}`);
+      get(unreadRef).then(snap => {
+        const val = snap.exists() ? snap.val() : 0;
+        set(unreadRef, val + 1);
+      });
+    }
+
+    function clearUnread(chatId, uid) {
+      if (chatId === "bist") return;
+      set(ref(db, `chatMeta/${chatId}/unread/${uid}`), 0);
+    }
+
+    function sendMessage() {
+      const textarea = document.getElementById("msg");
+      const text = textarea.value.trim();
+      if (!text) return;
+      const timestamp = Date.now();
+      set(ref(db, "chats/" + currentChat + "/" + timestamp), {
+        uid: currentUser.uid,
+        msg: text,
+        time: timestamp
+      }).then(() => {
+        updateLastActive(currentChat, true);
+        if (currentChat !== "bist") {
+          get(ref(db, "users/" + currentUser.uid + "/chats/" + currentChat)).then(snap => {
+            const otherEmail = snap.val();
+            get(query(ref(db, "profiles"), orderByChild("email"), equalTo(otherEmail))).then(snap2 => {
+              if (snap2.exists()) {
+                const otherUid = Object.keys(snap2.val())[0];
+                if (otherUid !== currentUser.uid) {
+                  incrementUnread(currentChat, otherUid);
+                }
+              }
+            });
+          });
+        }
+      });
+      textarea.value = "";
+      textarea.style.height = textarea.style.minHeight;
+    }
 
     document.getElementById("msg").addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-     }
-     });
-    document.getElementById("msg").addEventListener("input", function () {
-      this.style.height = "auto"; // resetta
-      this.style.height = Math.min(this.scrollHeight, 120) + "px"; // si espande fino a 120px
-     });
-
-function loadMessages(chatId) {
-  const area = document.getElementById("chat-messages");
-  area.innerHTML = "";
-
-  // Rimuovi tutti i listener precedenti
-  Object.keys(messageListeners).forEach(id => {
-    off(ref(db, "chats/" + id), "child_added", messageListeners[id]);
-    delete messageListeners[id];
-  });
-
-  const chatRef = ref(db, "chats/" + chatId);
-  const callback = snap => {
-    // Mostra solo i messaggi della chat attiva
-    if (currentChat !== chatId) return;
-    const data = snap.val();
-    getDisplayName(data.uid, name => {
-      const msgDiv = document.createElement("div");
-      msgDiv.className = "message" + (data.uid === currentUser.uid ? " message-own" : "");
-      const time = new Date(data.time).toLocaleString();
-      msgDiv.textContent = `[${time}] ${name}: ${data.msg}`;
-      area.appendChild(msgDiv);
-      area.scrollTop = area.scrollHeight;
-      hideChatLoading(); // Nasconde il loader appena arriva un messaggio
+        e.preventDefault();
+        sendMessage();
+      }
     });
-  };
 
-  messageListeners[chatId] = callback;
-  onChildAdded(chatRef, callback);
+    document.getElementById("msg").addEventListener("input", function () {
+      this.style.height = "auto";
+      this.style.height = Math.min(this.scrollHeight, 120) + "px";
+    });
 
-  // Controlla se la chat è vuota o non esiste e nasconde il loader
-  get(chatRef).then(snap => {
-    if (!snap.exists() || Object.keys(snap.val() || {}).length === 0) {
-      hideChatLoading();  // Nasconde il loader se non ci sono messaggi
+    function loadMessages(chatId) {
+      const area = document.getElementById("chat-messages");
+      area.innerHTML = "";
+
+      Object.keys(messageListeners).forEach(id => {
+        off(ref(db, "chats/" + id), "child_added", messageListeners[id]);
+        delete messageListeners[id];
+      });
+
+      const chatRef = ref(db, "chats/" + chatId);
+
+      // Carica e renderizza TUTTI i messaggi e i divisori in modo sincrono e ordinato
+      get(chatRef).then(snap => {
+        area.innerHTML = "";
+        let lastDate = null;
+        let msgElements = [];
+        if (snap.exists()) {
+          // Ordina i messaggi per data
+          const messages = Object.values(snap.val()).sort((a, b) => a.time - b.time);
+          // Pre-raccogli tutti i displayName per evitare rendering asincrono fuori ordine
+          const uids = [...new Set(messages.map(m => m.uid))];
+          const nameMap = {};
+          Promise.all(uids.map(uid =>
+            new Promise(resolve => {
+              getDisplayName(uid, name => {
+                nameMap[uid] = name;
+                resolve();
+              });
+            })
+          )).then(() => {
+            // Costruisci tutti i nodi DOM PRIMA di inserirli
+            const nodes = [];
+            messages.forEach(data => {
+              const msgDate = new Date(data.time);
+              const dateStr = msgDate.toLocaleDateString();
+              if (lastDate !== dateStr) {
+                const divider = document.createElement("div");
+                divider.className = "date-divider";
+                divider.textContent = `=---------------------------= ${dateStr} =---------------------------=`;
+                nodes.push(divider);
+                lastDate = dateStr;
+              }
+              const msgDiv = document.createElement("div");
+              msgDiv.id = "msg-" + data.time;
+              msgDiv.className = "message" + (data.uid === currentUser.uid ? " message-own" : "");
+              const time = msgDate.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+              msgDiv.textContent = `[${time}] ${nameMap[data.uid] || "Unknow User"}: ${data.msg}`;
+              nodes.push(msgDiv);
+            });
+            // Svuota e inserisci tutto in una volta sola per evitare glitch di layout
+            area.innerHTML = "";
+            nodes.forEach(n => area.appendChild(n));
+            area.scrollTop = area.scrollHeight;
+            hideChatLoading();
+          });
+        } else {
+          hideChatLoading();
+        }
+      });
+
+      // Listener realtime SOLO per nuovi messaggi (aggiunge in fondo)
+      const callback = snap => {
+        const data = snap.val();
+        const msgId = "msg-" + data.time;
+        if (document.getElementById(msgId)) return;
+
+        const msgDate = new Date(data.time);
+        const dateStr = msgDate.toLocaleDateString();
+        // Trova l'ultimo divisore nel DOM
+        let lastDivider = null;
+        const dividers = Array.from(area.getElementsByClassName("date-divider"));
+        if (dividers.length > 0) lastDivider = dividers[dividers.length - 1];
+        if (!lastDivider || lastDivider.textContent.indexOf(dateStr) === -1) {
+          const divider = document.createElement("div");
+          divider.className = "date-divider";
+          divider.textContent = `=----------------------= ${dateStr} =----------------------=`;
+          area.appendChild(divider);
+        }
+        getDisplayName(data.uid, name => {
+          const msgDiv = document.createElement("div");
+          msgDiv.id = msgId;
+          msgDiv.className = "message" + (data.uid === currentUser.uid ? " message-own" : "");
+          const time = msgDate.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+          msgDiv.textContent = `[${time}] ${name}: ${data.msg}`;
+          area.appendChild(msgDiv);
+          area.scrollTop = area.scrollHeight;
+          hideChatLoading();
+        });
+        if (chatId !== "bist" && data.uid !== currentUser.uid) {
+          if (currentChat !== chatId) {
+            incrementUnread(chatId, currentUser.uid);
+          }
+        }
+      };
+
+      messageListeners[chatId] = callback;
+      onChildAdded(chatRef, callback);
+
+      if (chatId !== "bist") {
+        clearUnread(chatId, currentUser.uid);
+      }
     }
-  });
-}
 
+    let chatMetaListener = null;
     function loadChats() {
       const list = document.getElementById("chat-list");
       list.innerHTML = "";
+
       const bist = document.createElement("div");
-      bist.textContent = "BIST Chat";
+      bist.innerHTML = `BIST Chat <span class="pin-emoji">📌</span>`;
       bist.className = "chat-item active";
       bist.onclick = () => switchChat("bist", bist);
       list.appendChild(bist);
 
-      get(ref(db, "users/" + currentUser.uid + "/chats")).then(snap => {
-        const chats = snap.val();
-        if (chats) {
-          Object.keys(chats).forEach(chatId => {
-  const email = chats[chatId];
-  get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
-    const name = snap.exists()
-      ? Object.values(snap.val())[0].name
-      : email;
+      get(ref(db, "users/" + currentUser.uid + "/chats")).then(chatsSnap => {
+        const chats = chatsSnap.val();
+        if (!chats) return;
 
-    const item = document.createElement("div");
-    item.textContent = name;
-    item.className = "chat-item";
-    item.onclick = () => switchChat(chatId, item);
-    list.appendChild(item);
-  });
-});
-        }
+        if (chatMetaListener) chatMetaListener();
+
+        chatMetaListener = onValue(ref(db, "chatMeta"), metaSnap => {
+          const meta = metaSnap.exists() ? metaSnap.val() : {};
+          renderChats(chats, meta);
+        });
       });
     }
 
-function showChatLoading() {
-  document.getElementById("chat-loader").style.display = "flex";
-  document.getElementById("msg").disabled = true;
-  document.getElementById("send-btn").disabled = true;
-}
+    function renderChats(chats, meta) {
+      const list = document.getElementById("chat-list");
+      let selectedChatId = null;
+      const selected = list.querySelector(".chat-item.active");
+      if (selected && selected.textContent !== "📌BIST Chat") {
+        const idx = [...list.children].indexOf(selected) - 1;
+        if (idx >= 0) {
+          const chatIds = Object.keys(chats);
+          selectedChatId = chatIds[idx];
+        }
+      }
 
-function hideChatLoading() {
-  document.getElementById("chat-loader").style.display = "none";
-  document.getElementById("msg").disabled = false;
-  document.getElementById("send-btn").disabled = false;
-}
+      while (list.children.length > 1) list.removeChild(list.lastChild);
+
+      const rendered = new Set();
+
+      let maxLastActive = 0;
+      Object.keys(chats).forEach(chatId => {
+        const lastActive = meta[chatId]?.lastActive || 0;
+        if (lastActive > maxLastActive) maxLastActive = lastActive;
+      });
+
+      const chatArr = Object.keys(chats).map(chatId => {
+        const lastActive = meta[chatId]?.lastActive || 0;
+        const unread = meta[chatId]?.unread?.[currentUser.uid] || 0;
+        return { chatId, email: chats[chatId], lastActive, unread };
+      });
+
+      if (maxLastActive > 0) {
+        chatArr.sort((a, b) => b.lastActive - a.lastActive);
+      }
+
+      chatArr.forEach(({ chatId, email, unread }) => {
+        if (rendered.has(chatId)) return;
+        rendered.add(chatId);
+
+        get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
+          const name = snap.exists()
+            ? Object.values(snap.val())[0].name
+            : email;
+
+          if ([...list.children].some(el => el.textContent === name || el.textContent === email)) return;
+
+          const item = document.createElement("div");
+          item.className = "chat-item";
+          item.onclick = () => switchChat(chatId, item);
+
+          if (chatId === currentChat) item.classList.add("active");
+
+          item.innerHTML = `<span>${name}</span>` +
+            (unread > 0
+              ? `<span class="chat-notify">${unread > 9 ? "9+" : unread}</span>`
+              : "");
+
+          list.appendChild(item);
+
+          if (chatId !== "bist" && meta[chatId]) {
+            onValue(ref(db, `chatMeta/${chatId}/unread/${currentUser.uid}`), snapUnread => {
+              const badge = item.querySelector(".chat-notify");
+              const val = snapUnread.exists() ? snapUnread.val() : 0;
+              if (val > 0) {
+                if (badge) {
+                  badge.textContent = val > 9 ? "9+" : val;
+                } else {
+                  const notify = document.createElement("span");
+                  notify.className = "chat-notify";
+                  notify.textContent = val > 9 ? "9+" : val;
+                  item.appendChild(notify);
+                }
+              } else if (badge) {
+                badge.remove();
+              }
+            });
+          }
+        });
+      });
+    }
+
+    function showChatLoading() {
+      document.getElementById("chat-loader").style.display = "flex";
+      document.getElementById("msg").disabled = true;
+      document.getElementById("send-btn").disabled = true;
+    }
+
+    function hideChatLoading() {
+      document.getElementById("chat-loader").style.display = "none";
+      document.getElementById("msg").disabled = false;
+      document.getElementById("send-btn").disabled = false;
+    }
 
     function switchChat(chatId, element) {
       showChatLoading();
       document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
       if (element) element.classList.add("active");
       if (chatId === "bist") {
-    document.getElementById("chat-name").innerText = "BIST Chat";
-  } else {
-    get(ref(db, "users/" + currentUser.uid + "/chats/" + chatId)).then(snap => {
-      const email = snap.val();
-      get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap2 => {
-        const name = snap2.exists()
-          ? Object.values(snap2.val())[0].name
-          : email;
-        document.getElementById("chat-name").innerText = name;
-      });
-    });
-  }
+        document.getElementById("chat-name").innerText = "BIST Chat";
+      } else {
+        get(ref(db, "users/" + currentUser.uid + "/chats/" + chatId)).then(snap => {
+          const email = snap.val();
+          get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap2 => {
+            const name = snap2.exists()
+              ? Object.values(snap2.val())[0].name
+              : email;
+            document.getElementById("chat-name").innerText = name;
+          });
+        });
+        clearUnread(chatId, currentUser.uid);
+      }
       currentChat = chatId;
       loadMessages(chatId);
     }
 
     function addUserChat() {
-      const email = prompt("Insert the email of the user you want to chat with:");
-      if (!email) return;
-      if (email === currentUser.email) {
-        alert("You can't create a chat with yourself!");
-        return;
-      }
-      const safeCurrent = safeEmail(currentUser.email);
-      const safeOther = safeEmail(email);
-      const chatId = [safeCurrent, safeOther].sort().join("_");
-      get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
-        if (snap.exists()) {
-          const otherUid = Object.keys(snap.val())[0];
-          Promise.all([
-            set(ref(db, "users/" + currentUser.uid + "/chats/" + chatId), email),
-            set(ref(db, "users/" + otherUid + "/chats/" + chatId), currentUser.email),
-            set(ref(db, "chats/" + chatId), {})
-          ]).then(() => {
-            loadChats();
-            setTimeout(() => {
-              const newChatElement = Array.from(document.querySelectorAll(".chat-item")).find(e => e.textContent === email);
-              if (newChatElement) {
-                switchChat(chatId, newChatElement);
-              }
-            }, 500);
+      showPopup({
+        title: "Insert the email of the user you want to chat with:",
+        inputType: "email",
+        okText: "Add",
+        cancelText: "Cancel",
+        onOk: email => {
+          if (!email) return;
+          if (email === currentUser.email) {
+            showAlert("You can't create a chat with yourself!");
+            return;
+          }
+          const safeCurrent = safeEmail(currentUser.email);
+          const safeOther = safeEmail(email);
+          const chatId = [safeCurrent, safeOther].sort().join("_");
+          get(query(ref(db, "profiles"), orderByChild("email"), equalTo(email))).then(snap => {
+            if (snap.exists()) {
+              const otherUid = Object.keys(snap.val())[0];
+              Promise.all([
+                set(ref(db, "users/" + currentUser.uid + "/chats/" + chatId), email),
+                set(ref(db, "users/" + otherUid + "/chats/" + chatId), currentUser.email),
+                set(ref(db, "chats/" + chatId), {})
+              ]).then(() => {
+                loadChats();
+                setTimeout(() => {
+                  const newChatElement = Array.from(document.querySelectorAll(".chat-item")).find(e => e.textContent === email);
+                  if (newChatElement) {
+                    switchChat(chatId, newChatElement);
+                  }
+                }, 500);
+              });
+            } else {
+              showAlert("User not found...");
+            }
           });
-        } else {
-          alert("User not found...");
         }
       });
     }
 
     function changeDisplayName() {
-      const newName = prompt("Insert your new nickname:");
-      if (!newName || !currentUser) return;
-      set(ref(db, "profiles/" + currentUser.uid + "/name"), newName);
-      displayNameMap[currentUser.uid] = newName;
+      showPopup({
+        title: "Insert your new nickname:",
+        inputType: "text",
+        okText: "OK",
+        cancelText: "Cancel",
+        onOk: newName => {
+          if (!newName || !currentUser) return;
+          set(ref(db, "profiles/" + currentUser.uid + "/name"), newName);
+          displayNameMap[currentUser.uid] = newName;
+        }
+      });
     }
 
     function logout() {
       signOut(auth).then(() => {
-      document.getElementById("app").style.display = "none";
-      document.getElementById("login").style.display = "flex";
-      document.getElementById("email").value = "";
-      document.getElementById("password").value = "";
-      currentUser = null;
-      currentChat = "bist";
-      Object.values(messageListeners).forEach(listener => off(listener));
-      messageListeners = {};
-      displayNameMap = {};
-      document.getElementById("chat-messages").innerHTML = "";
-    });
-  }
+        location.reload();
+      });
+    }
   </script>
 </head>
 <body>
   <div id="login">
-    <h2>Login into BIST Chat</h2>
+    <h2>Welcome to BIST Chat</h2>
     <input id="email" type="email" placeholder="Email"><br>
     <input id="password" type="password" placeholder="Password"><br>
     <button id="login-btn">Login</button>
@@ -490,9 +812,9 @@ function hideChatLoading() {
   </div>
   <div id="app" style="display:none; width:100%;">
     <div id="sidebar">
-      <h3>Chats</h3>
+      <h3>Chats List</h3>
       <div id="chat-list"></div>
-      <div id="version">beta-0.2.01(fix-000)</div>
+      <div id="version">openbeta-0.3.00</div>
     </div>
     <div id="main">
       <div id="chat-header">
@@ -504,11 +826,11 @@ function hideChatLoading() {
         </div>
       </div>
       <div id="chat-area" style="position: relative;">
-  <div id="chat-messages"></div>
-  <div id="chat-loader">
-    <div class="loader-text">Loading BIST Chat...</div>
-  </div>
-</div>
+        <div id="chat-messages"></div>
+        <div id="chat-loader">
+          <div class="loader-text">Loading the BIST Chat...</div>
+        </div>
+      </div>
       <div id="chat-input">
         <textarea id="msg" placeholder="Insert a message..." rows="1"></textarea>
         <button id="send-btn">Send</button>
